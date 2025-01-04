@@ -1,0 +1,47 @@
+import numpy as np
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+
+def recommend_books(person, ratings, k=5):
+    ratings = ratings.T.fillna(0)  # Transpose and replace NaN values with 0
+    similarity = pd.DataFrame(cosine_similarity(ratings), index=ratings.index, columns=ratings.index)
+    print("Done computing similarity matrix.")  # This line confirms similarity matrix is computed
+    person_ratings = ratings.T.loc[person]  # Get ratings for the person
+    predictions = {}
+    
+    # Compute predictions for books that the person has not rated
+    for book in similarity.index:
+        if pd.isna(person_ratings[book]):
+            numerator = sum(
+                similarity[book][other] * person_ratings[other]
+                for other in similarity.index if not pd.isna(person_ratings[other])
+            )
+            denominator = sum(
+                abs(similarity[book][other])
+                for other in similarity.index if not pd.isna(person_ratings[other])
+            )
+            predictions[book] = numerator / denominator if denominator != 0 else 0
+
+    # Sorting recommendations by predicted rating and returning top 'k' books
+    top_recommendations = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:k]
+    return top_recommendations
+
+if __name__ == "__main__":
+    data = {
+        'Person': ['Usama', 'Shayan', 'Dua', 'Usama', 'Dua', 'Usama', 'Shayan', 'Murtaza', 'Shayan', 'Dua'],
+        'Book': ['Book1', 'Book2', 'Book3', 'Book1', 'Book3', 'Book1', 'Book2', 'Book4', 'Book2', 'Book3'],
+        'Rating': [5, 4, 3, 5, 4, 4, 5, 3, 2, 4]
+    }
+    df = pd.DataFrame(data)
+    
+    # Aggregate duplicate entries by taking the mean rating
+    df = df.groupby(['Person', 'Book'], as_index=False).mean()
+    ratings_matrix = df.pivot(index='Person', columns='Book', values='Rating')
+    
+    person = 'Usama'  # Target person for recommendations
+    recommendations = recommend_books(person, ratings_matrix)
+    
+    # Displaying the recommendations with predicted ratings
+    print(f"\nTop 5 movie/book recommendations for {person}:")
+    for book, rating in recommendations:
+        print(f"{book}: Predicted Rating = {rating:.2f}")
